@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日本代購 - 線上下單系統</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; padding: 15px; background: #f8f9fa; color: #333; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 25px; border-radius: 16px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
+        h2 { text-align: center; color: #d32f2f; margin-bottom: 10px; }
+        .sub-title { text-align: center; font-size: 14px; color: #666; margin-bottom: 25px; }
+        
+        label { display: block; margin-top: 15px; font-weight: bold; color: #444; }
+        input, textarea { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        
+        .item-card { border: 1px solid #eee; padding: 15px; margin-top: 15px; border-radius: 12px; background: #fffcfc; position: relative; }
+        .item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .remove-btn { color: #ff5252; font-size: 13px; cursor: pointer; font-weight: bold; }
+        
+        .btn-add { background: #546e7a; color: white; margin-top: 15px; padding: 12px; width: 100%; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; transition: 0.3s; }
+        .btn-submit { background: #d32f2f; color: white; margin-top: 25px; padding: 15px; width: 100%; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(211,47,47,0.3); }
+        
+        button:disabled { background: #ccc; box-shadow: none; }
+        .price-info { color: #888; font-size: 12px; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>日本代購下單</h2>
+    <div class="sub-title">請填寫您的購買清單，送出後將由專人對帳</div>
+
+    <label>社群名稱 (FB/IG 帳號)</label>
+    <input type="text" id="socialMedia" placeholder="例如：candy123 (方便核對身分)" required>
+
+    <div id="itemsContainer">
+        <div class="item-card">
+            <div class="item-header"><span>商品項目 #1</span></div>
+            <label>商品完整名稱</label>
+            <input type="text" class="p-name" placeholder="請輸入商品名稱" required>
+            <label>數量</label>
+            <input type="number" class="p-qty" value="1" min="1">
+            <label>預計單價 (日幣/台幣)</label>
+            <input type="number" class="p-price" placeholder="請填寫金額">
+        </div>
+    </div>
+
+    <button type="button" class="btn-add" onclick="addItem()">＋ 新增另一項商品</button>
+
+    <label>整單備註 (如：收件資訊、顏色規格)</label>
+    <textarea id="note" rows="3" placeholder="有什麼想對代購說的嗎？"></textarea>
+
+    <button type="button" class="btn-submit" id="submitBtn" onclick="sendOrder()">確認送出代購清單</button>
+</div>
+
+<script>
+    // --- 請修改下方配置 ---
+    const LIFF_ID = "2009547519-yh8gyGqP"; 
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzC9kfaZansTKwJOi4iWEi-lfOUv0apZO7FAODBt0youXICv1H5CNa7Kjd9BKiRyFxo/exec"; 
+    // -------------------
+
+    let itemCount = 1;
+
+    liff.init({ liffId: LIFF_ID }).then(() => {
+        if (!liff.isLoggedIn()) liff.login();
+    });
+
+    function addItem() {
+        itemCount++;
+        const container = document.getElementById('itemsContainer');
+        const div = document.createElement('div');
+        div.className = 'item-card';
+        div.innerHTML = `
+            <div class="item-header">
+                <span>商品項目 #${itemCount}</span>
+                <span class="remove-btn" onclick="this.parentElement.parentElement.remove()">✕ 移除此項</span>
+            </div>
+            <label>商品完整名稱</label>
+            <input type="text" class="p-name" placeholder="請輸入商品名稱" required>
+            <label>數量</label>
+            <input type="number" class="p-qty" value="1" min="1">
+            <label>預計單價</label>
+            <input type="number" class="p-price" placeholder="請填寫金額">
+        `;
+        container.appendChild(div);
+    }
+
+    async function sendOrder() {
+        const productInputs = document.querySelectorAll('.p-name');
+        const qtyInputs = document.querySelectorAll('.p-qty');
+        const priceInputs = document.querySelectorAll('.p-price');
+        const socialMedia = document.getElementById('socialMedia').value.trim();
+        const note = document.getElementById('note').value.trim();
+
+        if (!socialMedia) return alert("請填寫社群名稱喔！");
+
+        const items = [];
+        productInputs.forEach((input, index) => {
+            if (input.value.trim()) {
+                items.push({
+                    product: input.value.trim(),
+                    quantity: qtyInputs[index].value,
+                    price: priceInputs[index].value
+                });
+            }
+        });
+
+        if (items.length === 0) return alert("請至少填寫一項商品名稱！");
+
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.innerText = "正在傳送清單...";
+
+        const profile = await liff.getProfile();
+        const payload = {
+            userName: profile.displayName,
+            socialMedia: socialMedia,
+            items: items,
+            note: note
+        };
+
+        fetch(GAS_URL, {
+            method: "POST",
+            mode: "no-cors",
+            body: JSON.stringify(payload)
+        }).then(() => {
+            alert("代購清單已成功送出！請等待我們通知。");
+            liff.closeWindow();
+        }).catch(err => {
+            alert("傳送失敗，請檢查網路連線");
+            btn.disabled = false;
+            btn.innerText = "確認送出代購清單";
+        });
+    }
+</script>
+</body>
+</html>
